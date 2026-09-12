@@ -1212,13 +1212,12 @@ function render(){
   else if (currentView === "inspect") root.innerHTML = renderInspect();
   else if (currentView === "mangel") root.innerHTML = renderMangelListe();
   else if (currentView === "archive") root.innerHTML = renderArchive();
-  else if (currentView === "settings") root.innerHTML = renderSettings();
   attachViewHandlers();
   window.scrollTo(0, y);
 }
 
 function renderChrome(){
-  const items = [["dashboard","Dashboard"],["fleet","Fahrzeugliste"],["inspect","Kontrolle durchführen"],["mangel","Mängel-Liste"],["archive","Archiv"],["settings","Einstellungen"]];
+  const items = [["dashboard","Dashboard"],["fleet","Fahrzeugliste"],["inspect","Kontrolle durchführen"],["mangel","Mängel-Liste"],["archive","Archiv"]];
   document.getElementById("nav").innerHTML = items.map(([k,t]) =>
     '<button class="' + (currentView===k?"active":"") + '" data-navview="' + k + '">' + t + '</button>').join("");
 
@@ -1835,60 +1834,6 @@ function renderArchive(){
   '</div>';
 }
 
-/* ---------- Einstellungen ---------- */
-
-function renderSettings(){
-  const st = mailSettings();
-  const log = Object.entries(STATE.mailLog || {})
-    .sort((a,b) => (b[1].sentAt || "").localeCompare(a[1].sentAt || ""))
-    .slice(0, 12);
-
-  const logRows = log.length
-    ? log.map(([key, e]) => {
-        const [plate, quarter] = key.split("__");
-        return '<tr class="sev-' + (e.ok ? "ok" : "bad") + '">' +
-          '<td>' + plateChip(plate) + '</td>' +
-          '<td class="text">' + quarter + '</td>' +
-          '<td class="text">' + fmtDateCH((e.sentAt||"").slice(0,10)) + '</td>' +
-          '<td class="text status-cell">' + statusDot(e.ok ? "ok" : "bad") + (e.ok ? "Gesendet" : "Fehlgeschlagen") + '</td>' +
-          '<td class="text hint">' + (e.error || e.to || "") + '</td>' +
-          '<td class="text">' + (e.ok ? "" :
-            '<button class="btn small secondary" data-action="send-mail" data-plate="' + plate + '" data-quarter="' + quarter + '">Erneut senden</button>') + '</td>' +
-        '</tr>';
-      }).join("")
-    : '<tr class="empty-row"><td colspan="6" class="text"><span class="hint">Noch kein Versand erfasst.</span></td></tr>';
-
-  return '' +
-  '<header class="page-head">' +
-    '<div><h1>Einstellungen</h1><p>Automatischer Versand der Inspektionsberichte.</p></div>' +
-  '</header>' +
-  '<div class="card">' +
-    '<h2>Versand der Berichte</h2>' +
-    '<div class="desc">Nach jeder gespeicherten Kontrolle wird das PDF erzeugt und an die hinterlegte Adresse geschickt.</div>' +
-    '<div class="grid-2">' +
-      '<div class="field"><label>Empfängeradresse</label>' +
-        '<input type="text" id="set-mailto" value="' + st.mailTo + '"/>' +
-        '<div class="hint">Kanaladresse in Microsoft Teams.</div></div>' +
-      '<div class="field"><label>Versandweg</label>' +
-        '<div class="note" style="margin-top:2px">Resend über die Serverfunktion <b>/api/send-report</b>. ' +
-        'Absenderdomain und Schlüssel liegen als Umgebungsvariablen im Vercel-Projekt, nicht in dieser Seite.</div></div>' +
-    '</div>' +
-    '<label class="check"><input type="checkbox" id="set-autosend"' + (st.autoSend ? " checked" : "") + '/>' +
-      'Bericht nach dem Speichern automatisch senden</label>' +
-    '<div class="row" style="margin-top:14px">' +
-      '<button class="btn primary-action" id="set-save">Einstellungen speichern</button>' +
-      '<button class="btn secondary" id="set-test">Testversand mit letzter Kontrolle</button>' +
-    '</div>' +
-  '</div>' +
-  '<div class="card flush">' +
-    '<div class="card-head"><h2>Versandprotokoll</h2><span class="tag idle">letzte 12 Vorgänge</span></div>' +
-    '<div class="table-wrap"><table><thead><tr>' +
-      '<th>Fahrzeug</th><th class="text">Quartal</th><th class="text">Datum</th><th class="text">Status</th><th class="text">Hinweis</th><th class="text"></th>' +
-    '</tr></thead><tbody>' + logRows + '</tbody></table></div>' +
-    '<div style="padding:0 20px 18px"></div>' +
-  '</div>';
-}
-
 /* ---------- Vehicle detail modal ---------- */
 
 function openDetail(plate, quarterLabel){
@@ -2092,12 +2037,9 @@ const MAIL_DEFAULT_TO = "c1c5ced6.clean-service.ch@emea.teams.ms";
 const MAIL_ENDPOINT = "/api/send-report";
 
 function mailSettings(){
-  if (!STATE.settings) STATE.settings = {};
-  const st = STATE.settings;
-  if (st.mailTo === undefined) st.mailTo = MAIL_DEFAULT_TO;
-  if (st.autoSend === undefined) st.autoSend = true;
-  st.mailEndpoint = MAIL_ENDPOINT;
-  return st;
+  /* Fest verdrahtet: Empfaenger, Versandweg und automatischer Versand
+     sind nicht mehr in der App einstellbar. */
+  return { mailTo: MAIL_DEFAULT_TO, mailEndpoint: MAIL_ENDPOINT, autoSend: true };
 }
 
 function mailKey(plate, quarter){ return plate + "__" + quarter; }
@@ -2260,27 +2202,6 @@ function attachViewHandlers(){
       if (again){ again.focus(); again.setSelectionRange(caret, caret); }
     });
   }
-
-  const setSave = document.getElementById("set-save");
-  if (setSave) setSave.addEventListener("click", async () => {
-    const st = mailSettings();
-    st.mailTo = document.getElementById("set-mailto").value.trim();
-    st.autoSend = document.getElementById("set-autosend").checked;
-    await saveState(); render();
-    toast("Einstellungen gespeichert", "pos");
-  });
-  const setTest = document.getElementById("set-test");
-  if (setTest) setTest.addEventListener("click", async () => {
-    const st = mailSettings();
-    st.mailTo = document.getElementById("set-mailto").value.trim();
-    await saveState();
-    const v = STATE.vehicles[0];
-    if (!v){ toast("Kein Fahrzeug vorhanden", "neg"); return; }
-    setTest.disabled = true; setTest.textContent = "Testversand läuft …";
-    await sendInspectionMail(v.plate, latestInspection(v.plate).quarter);
-    setTest.disabled = false; setTest.textContent = "Testversand mit letzter Kontrolle";
-    render();
-  });
 
   const plateSel = document.getElementById("insp-plate");
   if (plateSel) plateSel.addEventListener("change", (e) => {
