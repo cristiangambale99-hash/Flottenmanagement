@@ -495,7 +495,7 @@ const ISO45001_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAIIAAACCCAIAAAAFYYeqAAAACXBIWXM
    Data model, business rules, rendering (Clean-Service-Layout), storage
    ========================================================= */
 
-const TEAM = ["Cristian Gambale","Fiorella Scalone","Lina","Loris","Tayron Moreno","Eliano Di Paolo","Lee-Ann Braun","Natan"];
+const TEAM = ["Natan Scaramuzzo","Loris Scaramuzzo"];
 
 const DEFAULT_VEHICLES = [
 ];
@@ -1044,8 +1044,10 @@ function renderInspect(){
     const qOptions = [-1,0,1].map(off => quarterByOffset(baseLabel, off));
     const quarterSelect = qOptions.map(ql =>
       '<option value="' + ql + '"' + (ql===inspectForm.editingQuarter ? " selected":"") + '>' + ql + (ql===baseLabel ? " (aktuell)":"") + '</option>').join("");
+    const isCustomInspector = !TEAM.includes(inspectForm.inspector);
     const inspectorOptions = TEAM.map(t =>
-      '<option value="' + t + '"' + (t===inspectForm.inspector ? " selected":"") + '>' + t + '</option>').join("");
+      '<option value="' + t + '"' + (t===inspectForm.inspector ? " selected":"") + '>' + t + '</option>').join("")
+      + '<option value="__andere__"' + (isCustomInspector ? " selected":"") + '>Andere</option>';
 
     const banner = inspectForm.draft.isEdit
       ? '<div class="note">Du bearbeitest die bestehende Kontrolle für <b>' + inspectForm.editingQuarter + '</b> (zuletzt erfasst am ' + fmtDateCH(inspectForm.date) + ').</div>'
@@ -1064,7 +1066,9 @@ function renderInspect(){
         '<div class="field"><label>Quartal</label><select id="insp-quarter">' + quarterSelect + '</select></div>' +
         '<div class="field"><label>Datum</label><input id="insp-date" type="date" value="' + inspectForm.date + '"/></div>' +
       '</div>' +
-      '<div class="field" style="max-width:320px"><label>Kontrolliert von</label><select id="insp-inspector">' + inspectorOptions + '</select></div>' +
+      '<div class="field" style="max-width:320px"><label>Kontrolliert von</label><select id="insp-inspector">' + inspectorOptions + '</select>' +
+        (isCustomInspector ? '<input id="insp-inspector-custom" type="text" placeholder="Name eingeben" value="' + (inspectForm.inspector||"") + '" style="margin-top:8px"/>' : "") +
+      '</div>' +
       sectionsHtml +
       '<div class="row save-bar">' +
         '<button id="submit-inspection" class="btn primary-action">Kontrolle speichern</button>' +
@@ -1422,7 +1426,12 @@ function attachViewHandlers(){
   const dateInput = document.getElementById("insp-date");
   if (dateInput) dateInput.addEventListener("input", (e) => inspectForm.date = e.target.value);
   const inspectorSel = document.getElementById("insp-inspector");
-  if (inspectorSel) inspectorSel.addEventListener("change", (e) => inspectForm.inspector = e.target.value);
+  if (inspectorSel) inspectorSel.addEventListener("change", (e) => {
+    if (e.target.value === "__andere__"){ inspectForm.inspector = ""; render(); }
+    else { inspectForm.inspector = e.target.value; render(); }
+  });
+  const inspectorCustom = document.getElementById("insp-inspector-custom");
+  if (inspectorCustom) inspectorCustom.addEventListener("input", (e) => { inspectForm.inspector = e.target.value; });
 
   document.querySelectorAll(".zpill").forEach(el => el.addEventListener("click", () => {
     inspectForm.draft.answers[el.dataset.key].value = el.dataset.value; render();
